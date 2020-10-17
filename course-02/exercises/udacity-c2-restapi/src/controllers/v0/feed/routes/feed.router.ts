@@ -18,13 +18,65 @@ router.get('/', async (req: Request, res: Response) => {
 
 //@TODO
 //Add an endpoint to GET a specific resource by Primary Key
+router.get('/:id', async (req: Request, res: Response) => {
+    const id = req.params.id;
+    const intId = parseInt(id)
+    // check if id is present
+    if (!id || isNaN(intId)) {
+        return res.status(400).send({ message: 'id is missing or is not a number.' });
+    }
+
+    let item = await FeedItem.findByPk(intId);
+
+    if(item === null) {
+        return res.status(404).send({ message: `item not found for id: ${id}` });
+    }
+    else {
+        if(item.url) {
+            item.url = AWS.getGetSignedUrl(item.url);
+        }
+        return res.status(200).send(item);
+    }
+});
 
 // update a specific resource
 router.patch('/:id', 
     requireAuth, 
     async (req: Request, res: Response) => {
         //@TODO try it yourself
-        res.send(500).send("not implemented")
+        const id = req.params.id;
+        const caption = req.body.caption;
+        const fileName = req.body.url;
+        const intId = parseInt(id)
+        // check id is present
+        if (!id || isNaN(intId)) {
+            return res.status(400).send({ message: 'id is missing or is not a number.' });
+        }
+        if (!caption && !fileName) {
+            return res.status(400).send({ message: 'It was expected at least one property to update.' });
+        }
+        //first fetch the original item
+        let item = await FeedItem.findByPk(intId);
+        if(item === null) {
+            return res.status(404).send({ message: `item not found for id: ${id}` });
+        }
+        else {
+            interface myUrl {
+                caption?: string,
+                url?: string
+            }
+
+            let values: myUrl
+            if (caption && caption !== '') {
+                values.caption = caption;
+            }
+            if (fileName && fileName !== '') {
+                values.url = fileName;
+            }
+            let [number, affectedItems] = await FeedItem.update(values, { where: { id: intId}, returning: true });
+            affectedItems[0].url = AWS.getGetSignedUrl(affectedItems[0].url);
+            return res.status(200).send(affectedItems[0]);
+        }
 });
 
 
